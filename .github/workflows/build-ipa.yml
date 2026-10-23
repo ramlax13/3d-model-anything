@@ -9,7 +9,8 @@ on:
 
 jobs:
   build:
-    runs-on: macos-26
+    # Intel Macs: the Apple-chip pool (macos-26) was too busy to pick up the job.
+    runs-on: macos-26-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
