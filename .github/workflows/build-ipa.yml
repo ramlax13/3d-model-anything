@@ -1,0 +1,59 @@
+name: Build iPhone app (unsigned .ipa)
+
+# Run it by hand from the Actions tab, or automatically when this file changes.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/build-ipa.yml
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app uses iOS 26 APIs, so use the newest Xcode on the machine.
+      - name: Pick newest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: apps/house-capture
+        run: xcodegen generate
+
+      - name: Build (no code signing)
+        working-directory: apps/house-capture
+        run: |
+          xcodebuild \
+            -project HouseCapture.xcodeproj \
+            -target HouseCapture \
+            -configuration Release \
+            -sdk iphoneos \
+            SYMROOT="$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package as .ipa
+        working-directory: apps/house-capture
+        run: |
+          APP=$(find build/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          echo "Found $APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry 3DModelAnything.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3DModelAnything-ipa
+          path: apps/house-capture/3DModelAnything.ipa
+          retention-days: 30
